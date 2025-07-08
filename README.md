@@ -2,28 +2,28 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Simplex con Gráfica</title>
+  <title>Simplex con Restricciones con Variables</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
+    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
     input, textarea, button { width: 100%; padding: 10px; margin: 10px 0; }
-    canvas { margin-top: 20px; background: white; }
+    canvas { background: white; margin-top: 20px; }
     #resultado { background: #fff; padding: 15px; border: 1px solid #ccc; }
   </style>
 </head>
 <body>
 
-  <h2>📈 Método Simplex con Gráfica (2 Variables)</h2>
+  <h2>📈 Método Simplex con Gráfica (Entrada con variables)</h2>
 
-  <label>Función Objetivo (Z = ax + by):</label>
-  <input id="objetivo" placeholder="Ejemplo: 60 80">
+  <label>Función Objetivo (Ej: Z = 60x + 80y):</label>
+  <input id="objetivo" placeholder="Z = 60x + 80y">
 
-  <label>Restricciones (una por línea - formato: a b <= c):</label>
+  <label>Restricciones (una por línea):</label>
   <textarea id="restricciones" rows="6" placeholder="Ej:
-4 2 <= 100
-2 3 <= 120
-1 0 >= 0
-0 1 >= 0"></textarea>
+4x + 2y <= 100
+2x + 3y <= 90
+x >= 0
+y >= 0"></textarea>
 
   <button onclick="resolver()">Resolver y Graficar</button>
 
@@ -33,20 +33,34 @@
   <script>
     let chart = null;
 
+    function parseExpresion(exp) {
+      const coef = { x: 0, y: 0 };
+      const regex = /([-+]?\d*\.?\d*)\s*([xy])/g;
+      let match;
+      while ((match = regex.exec(exp)) !== null) {
+        let num = match[1];
+        if (num === "" || num === "+") num = 1;
+        else if (num === "-") num = -1;
+        coef[match[2]] += parseFloat(num);
+      }
+      return [coef.x, coef.y];
+    }
+
     function resolver() {
-      const objetivo = document.getElementById("objetivo").value.trim().split(/\s+/).map(Number);
-      const restriccionesInput = document.getElementById("restricciones").value.trim().split("\n");
-      
+      const objStr = document.getElementById("objetivo").value.trim();
+      const restStr = document.getElementById("restricciones").value.trim().split("\n");
+
+      const objMatch = objStr.match(/([\d\+\-\sxxyy\.]+)=([\d\+\-\sxxyy\.]+)/i);
+      const objCoefs = parseExpresion(objStr);
+
       const restricciones = [];
-      for (const r of restriccionesInput) {
-        const match = r.match(/^([\d.\-\s]+)(<=|>=|=)([\d.\-]+)$/);
-        if (!match) {
-          alert("Verifica el formato de las restricciones.");
-          return;
-        }
-        const coefs = match[1].trim().split(/\s+/).map(Number);
+      for (const r of restStr) {
+        const match = r.match(/(.+)(<=|>=|=)(.+)/);
+        if (!match) continue;
+        const lhs = match[1].trim();
         const tipo = match[2];
         const rhs = parseFloat(match[3]);
+        const coefs = parseExpresion(lhs);
         restricciones.push({ coefs, tipo, rhs });
       }
 
@@ -56,7 +70,7 @@
         for (let j = i + 1; j < restricciones.length; j++) {
           const p = interseccion(restricciones[i], restricciones[j]);
           if (p && esFactible(p, restricciones)) {
-            const z = objetivo[0]*p[0] + objetivo[1]*p[1];
+            const z = objCoefs[0]*p[0] + objCoefs[1]*p[1];
             puntos.push({ punto: p, z });
           }
         }
@@ -94,13 +108,12 @@
       return [x, y];
     }
 
-    function esFactible(punto, restricciones) {
-      const [x, y] = punto;
+    function esFactible([x, y], restricciones) {
       for (const r of restricciones) {
         const val = r.coefs[0] * x + r.coefs[1] * y;
         if (r.tipo === "<=" && val > r.rhs + 0.001) return false;
         if (r.tipo === ">=" && val < r.rhs - 0.001) return false;
-        if (r.tipo === "="  && Math.abs(val - r.rhs) > 0.001) return false;
+        if (r.tipo === "=" && Math.abs(val - r.rhs) > 0.001) return false;
       }
       return x >= 0 && y >= 0;
     }
@@ -159,5 +172,6 @@
       });
     }
   </script>
+
 </body>
 </html>
