@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Simplex con Restricciones con Variables</title>
+  <title>Método Simplex con Gráfica</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
-    body { font-family: Arial; background: #f4f4f4; padding: 20px; }
+    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
     input, textarea, button { width: 100%; padding: 10px; margin: 10px 0; }
     canvas { background: white; margin-top: 20px; }
     #resultado { background: #fff; padding: 15px; border: 1px solid #ccc; }
@@ -13,7 +13,7 @@
 </head>
 <body>
 
-  <h2>📈 Método Simplex con Gráfica (Entrada con variables)</h2>
+  <h2>📈 Método Simplex con Gráfica</h2>
 
   <label>Función Objetivo (Ej: Z = 60x + 80y):</label>
   <input id="objetivo" placeholder="Z = 60x + 80y">
@@ -34,8 +34,9 @@ y >= 0"></textarea>
     let chart = null;
 
     function parseExpresion(exp) {
+      exp = exp.replace(/\s/g, '').toLowerCase();
       const coef = { x: 0, y: 0 };
-      const regex = /([-+]?\d*\.?\d*)\s*([xy])/g;
+      const regex = /([+-]?\d*\.?\d*)\*?([xy])/g;
       let match;
       while ((match = regex.exec(exp)) !== null) {
         let num = match[1];
@@ -47,12 +48,13 @@ y >= 0"></textarea>
     }
 
     function resolver() {
-      const objStr = document.getElementById("objetivo").value.trim();
+      const objStr = document.getElementById("objetivo").value.trim().toLowerCase();
       const restStr = document.getElementById("restricciones").value.trim().split("\n");
 
-      const objMatch = objStr.match(/([\d\+\-\sxxyy\.]+)=([\d\+\-\sxxyy\.]+)/i);
+      // Validación objetivo
       const objCoefs = parseExpresion(objStr);
 
+      // Restricciones
       const restricciones = [];
       for (const r of restStr) {
         const match = r.match(/(.+)(<=|>=|=)(.+)/);
@@ -64,8 +66,8 @@ y >= 0"></textarea>
         restricciones.push({ coefs, tipo, rhs });
       }
 
+      // Calcular intersecciones factibles
       const puntos = [];
-
       for (let i = 0; i < restricciones.length; i++) {
         for (let j = i + 1; j < restricciones.length; j++) {
           const p = interseccion(restricciones[i], restricciones[j]);
@@ -86,7 +88,7 @@ y >= 0"></textarea>
 
       document.getElementById("resultado").innerHTML = `
         <h3>🔍 Resultado:</h3>
-        <b>Valor Óptimo Z:</b> ${optimo.z.toFixed(2)}<br>
+        <b>Z Máxima:</b> ${optimo.z.toFixed(2)}<br>
         <b>x:</b> ${optimo.punto[0].toFixed(2)}<br>
         <b>y:</b> ${optimo.punto[1].toFixed(2)}
       `;
@@ -165,8 +167,8 @@ y >= 0"></textarea>
         options: {
           responsive: true,
           scales: {
-            x: { beginAtZero: true },
-            y: { beginAtZero: true }
+            x: { beginAtZero: true, max: 100 },
+            y: { beginAtZero: true, max: 100 }
           }
         }
       });
