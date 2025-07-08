@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Método Simplex con Gráfica</title>
+  <title>Método Simplex Mejorado</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <style>
     body { font-family: Arial; padding: 20px; background: #f0f0f0; }
@@ -13,17 +13,17 @@
 </head>
 <body>
 
-  <h2>📈 Método Simplex con Gráfica</h2>
+  <h2>📈 Método Simplex (Con símbolos extendidos)</h2>
 
   <label>Función Objetivo (Ej: Z = 60x + 80y):</label>
   <input id="objetivo" placeholder="Z = 60x + 80y">
 
   <label>Restricciones (una por línea):</label>
   <textarea id="restricciones" rows="6" placeholder="Ej:
-4x + 2y <= 100
+4x + 2y ≤ 100
 2x + 3y <= 90
-x >= 0
-y >= 0"></textarea>
+x ≥ 0
+y ≥ 0"></textarea>
 
   <button onclick="resolver()">Resolver y Graficar</button>
 
@@ -47,17 +47,24 @@ y >= 0"></textarea>
       return [coef.x, coef.y];
     }
 
+    function normalizarSimbolos(str) {
+      return str.replace(/≤/g, "<=")
+                .replace(/≥/g, ">=")
+                .replace(/</g, "<")
+                .replace(/>/g, ">")
+                .replace(/=/g, "=");
+    }
+
     function resolver() {
       const objStr = document.getElementById("objetivo").value.trim().toLowerCase();
       const restStr = document.getElementById("restricciones").value.trim().split("\n");
 
-      // Validación objetivo
       const objCoefs = parseExpresion(objStr);
 
-      // Restricciones
       const restricciones = [];
-      for (const r of restStr) {
-        const match = r.match(/(.+)(<=|>=|=)(.+)/);
+      for (let r of restStr) {
+        r = normalizarSimbolos(r);
+        const match = r.match(/(.+?)(<=|>=|=|<|>)(.+)/);
         if (!match) continue;
         const lhs = match[1].trim();
         const tipo = match[2];
@@ -66,7 +73,6 @@ y >= 0"></textarea>
         restricciones.push({ coefs, tipo, rhs });
       }
 
-      // Calcular intersecciones factibles
       const puntos = [];
       for (let i = 0; i < restricciones.length; i++) {
         for (let j = i + 1; j < restricciones.length; j++) {
@@ -79,7 +85,7 @@ y >= 0"></textarea>
       }
 
       if (puntos.length === 0) {
-        document.getElementById("resultado").innerHTML = "<b>No hay región factible.</b>";
+        document.getElementById("resultado").innerHTML = "<b>⚠️ No hay región factible. Verifica si las restricciones se cruzan en una zona común.</b>";
         return;
       }
 
@@ -101,10 +107,8 @@ y >= 0"></textarea>
       const [a2, b2] = r2.coefs;
       const c1 = r1.rhs;
       const c2 = r2.rhs;
-
       const det = a1 * b2 - a2 * b1;
       if (det === 0) return null;
-
       const x = (c1 * b2 - c2 * b1) / det;
       const y = (a1 * c2 - a2 * c1) / det;
       return [x, y];
@@ -116,6 +120,8 @@ y >= 0"></textarea>
         if (r.tipo === "<=" && val > r.rhs + 0.001) return false;
         if (r.tipo === ">=" && val < r.rhs - 0.001) return false;
         if (r.tipo === "=" && Math.abs(val - r.rhs) > 0.001) return false;
+        if (r.tipo === "<" && val >= r.rhs) return false;
+        if (r.tipo === ">" && val <= r.rhs) return false;
       }
       return x >= 0 && y >= 0;
     }
