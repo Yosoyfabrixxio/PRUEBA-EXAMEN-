@@ -28,10 +28,18 @@ y ≥ 0"></textarea>
   <button onclick="resolver()">Resolver y Graficar</button>
 
   <div id="resultado"></div>
-  <canvas id="grafica" width="700" height="400"></canvas>
+  <canvas id="grafica" width="700" height="500"></canvas>
 
   <script>
     let chart = null;
+    const colores = [
+      'rgba(255, 99, 132, 1)',
+      'rgba(54, 162, 235, 1)',
+      'rgba(255, 206, 86, 1)',
+      'rgba(75, 192, 192, 1)',
+      'rgba(153, 102, 255, 1)',
+      'rgba(255, 159, 64, 1)'
+    ];
 
     function parseExpresion(exp) {
       exp = exp.replace(/\s/g, '').toLowerCase();
@@ -86,6 +94,7 @@ y ≥ 0"></textarea>
 
       if (puntos.length === 0) {
         document.getElementById("resultado").innerHTML = "<b>⚠️ No hay región factible. Verifica si las restricciones se cruzan en una zona común.</b>";
+        if (chart) chart.destroy();
         return;
       }
 
@@ -128,25 +137,51 @@ y ≥ 0"></textarea>
 
     function graficar(restricciones, puntosFactibles, puntoOptimo) {
       const datasets = [];
+      let allX = [], allY = [];
 
       for (let i = 0; i < restricciones.length; i++) {
         const r = restricciones[i];
-        const x = [0, 100];
-        const y = x.map(xi => {
-          const a = r.coefs[0];
-          const b = r.coefs[1];
-          if (b === 0) return null;
-          return (r.rhs - a * xi) / b;
-        });
+        const puntosLinea = [];
+
+        if (r.coefs[1] !== 0) {
+          for (let x = -5; x <= 100; x += 0.2) {
+            const a = r.coefs[0];
+            const b = r.coefs[1];
+            const y = (r.rhs - a * x) / b;
+            if (!isNaN(y) && y >= -5 && y <= 100) {
+              puntosLinea.push({ x, y });
+              allX.push(x);
+              allY.push(y);
+            }
+          }
+        } else if (r.coefs[0] !== 0) {
+          const x = r.rhs / r.coefs[0];
+          for (let y = -5; y <= 100; y += 0.2) {
+            puntosLinea.push({ x, y });
+            allX.push(x);
+            allY.push(y);
+          }
+        }
 
         datasets.push({
           label: `Restricción ${i + 1}`,
-          data: [{x: x[0], y: y[0]}, {x: x[1], y: y[1]}],
-          borderColor: 'rgba(0, 0, 255, 0.4)',
+          data: puntosLinea,
+          borderColor: colores[i % colores.length],
+          borderWidth: 2,
           fill: false,
-          tension: 0,
+          tension: 0
         });
       }
+
+      puntosFactibles.forEach(p => { allX.push(p[0]); allY.push(p[1]); });
+      allX.push(puntoOptimo[0]); allY.push(puntoOptimo[1]);
+
+      const minX = Math.max(-5, Math.min(...allX) - 2);
+      const maxX = Math.max(...allX) + 2;
+      const minY = Math.max(-5, Math.min(...allY) - 2);
+      const maxY = Math.max(...allY) + 2;
+      const stepX = Math.ceil((maxX - minX) / 10);
+      const stepY = Math.ceil((maxY - minY) / 10);
 
       datasets.push({
         label: "Región Factible",
@@ -173,8 +208,54 @@ y ≥ 0"></textarea>
         options: {
           responsive: true,
           scales: {
-            x: { beginAtZero: true, max: 100 },
-            y: { beginAtZero: true, max: 100 }
+            x: {
+              beginAtZero: true,
+              min: minX,
+              max: maxX,
+              title: {
+                display: true,
+                text: 'x',
+                color: '#000'
+              },
+              ticks: {
+                display: true,
+                color: '#000',
+                stepSize: stepX
+              },
+              grid: {
+                color: '#ccc',
+                drawTicks: true,
+                drawBorder: true
+              }
+            },
+            y: {
+              beginAtZero: true,
+              min: minY,
+              max: maxY,
+              title: {
+                display: true,
+                text: 'y',
+                color: '#000'
+              },
+              ticks: {
+                display: true,
+                color: '#000',
+                stepSize: stepY
+              },
+              grid: {
+                color: '#ccc',
+                drawTicks: true,
+                drawBorder: true
+              }
+            }
+          },
+          plugins: {
+            legend: {
+              display: true,
+              labels: {
+                color: '#000'
+              }
+            }
           }
         }
       });
