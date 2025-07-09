@@ -89,32 +89,7 @@ y >= 0</textarea>
       return x >= 0 && y >= 0;
     }
 
-    function validarEntradas() {
-      const objStr = document.getElementById("objetivo").value.trim();
-      const restStr = document.getElementById("restricciones").value.trim().split("\n");
-      
-      // Validar la función objetivo
-      const objMatch = objStr.match(/^Z\s*=\s*[\d\+\-\*x\s]+$/);
-      if (!objMatch) {
-        alert("La función objetivo no es válida. Asegúrate de que esté en el formato 'Z = ...'");
-        return false;
-      }
-
-      // Validar restricciones
-      for (let r of restStr) {
-        const match = r.match(/(.+?)(<=|>=|=)(.+)/);
-        if (!match) {
-          alert("Una o más restricciones no son válidas.");
-          return false;
-        }
-      }
-
-      return true;
-    }
-
     function resolver() {
-      if (!validarEntradas()) return; // Llama a la validación antes de resolver
-
       const tipoOpt = document.getElementById('tipoOptimizacion').value;
       const ctx = document.getElementById('grafica').getContext('2d');
       if (chart) chart.destroy();
@@ -141,7 +116,7 @@ y >= 0</textarea>
         for (let j = i + 1; j < restricciones.length; j++) {
           const p = interseccion(restricciones[i], restricciones[j]);
           if (p && esFactible(p, restricciones)) {
-            const z = objCoefs[0] * p[0] + objCoefs[1] * p[1];
+            const z = objCoefs[0]*p[0] + objCoefs[1]*p[1];
             puntos.push({ punto: p, z });
           }
         }
@@ -184,7 +159,7 @@ y >= 0</textarea>
         };
       });
 
-      const centro = puntos.reduce((acc, p) => [acc[0] + p.punto[0], acc[1] + p.punto[1]], [0, 0]).map(v => v / puntos.length);
+      const centro = puntos.reduce((acc, p) => [acc[0] + p.punto[0], acc[1] + p.punto[1]], [0,0]).map(v => v / puntos.length);
       puntos.sort((a, b) => {
         const angA = Math.atan2(a.punto[1] - centro[1], a.punto[0] - centro[0]);
         const angB = Math.atan2(b.punto[1] - centro[1], b.punto[0] - centro[0]);
