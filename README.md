@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>Método Simplex Mejorado</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
     body { font-family: Arial; padding: 20px; background: #f0f0f0; }
     input, textarea, select, button { width: 100%; padding: 10px; margin: 10px 0; }
@@ -88,7 +89,32 @@ y >= 0</textarea>
       return x >= 0 && y >= 0;
     }
 
+    function validarEntradas() {
+      const objStr = document.getElementById("objetivo").value.trim();
+      const restStr = document.getElementById("restricciones").value.trim().split("\n");
+      
+      // Validar la función objetivo
+      const objMatch = objStr.match(/^Z\s*=\s*[\d\+\-\*x\s]+$/);
+      if (!objMatch) {
+        alert("La función objetivo no es válida. Asegúrate de que esté en el formato 'Z = ...'");
+        return false;
+      }
+
+      // Validar restricciones
+      for (let r of restStr) {
+        const match = r.match(/(.+?)(<=|>=|=)(.+)/);
+        if (!match) {
+          alert("Una o más restricciones no son válidas.");
+          return false;
+        }
+      }
+
+      return true;
+    }
+
     function resolver() {
+      if (!validarEntradas()) return; // Llama a la validación antes de resolver
+
       const tipoOpt = document.getElementById('tipoOptimizacion').value;
       const ctx = document.getElementById('grafica').getContext('2d');
       if (chart) chart.destroy();
@@ -115,7 +141,7 @@ y >= 0</textarea>
         for (let j = i + 1; j < restricciones.length; j++) {
           const p = interseccion(restricciones[i], restricciones[j]);
           if (p && esFactible(p, restricciones)) {
-            const z = objCoefs[0]*p[0] + objCoefs[1]*p[1];
+            const z = objCoefs[0] * p[0] + objCoefs[1] * p[1];
             puntos.push({ punto: p, z });
           }
         }
@@ -126,12 +152,15 @@ y >= 0</textarea>
         return;
       }
 
+      const allX = puntos.map(p => p.punto[0]);
+      const allY = puntos.map(p => p.punto[1]);
+
       puntos.sort((a, b) => tipoOpt === 'max' ? b.z - a.z : a.z - b.z);
       const optimo = puntos[0];
 
-      // Trazar líneas de cada restricción
       const lineas = restricciones.map((r, index) => {
-        const puntos = [];
+        const puntosLinea = [];
+        let etiqueta = `${r.coefs[0]}x + ${r.coefs[1]}y ${r.tipo} ${r.rhs}`;
         for (let x = 0; x <= Math.max(...allX) + 5; x += 0.5) {
           const a = r.coefs[0];
           const b = r.coefs[1];
@@ -139,13 +168,13 @@ y >= 0</textarea>
           if (b !== 0) {
             const y = (c - a * x) / b;
             if (y >= 0 && y <= Math.max(...allY) + 5) {
-              puntos.push({ x, y });
+              puntosLinea.push({ x, y });
             }
           }
         }
         return {
-          label: `Restricción ${index + 1}`,
-          data: puntos,
+          label: etiqueta,
+          data: puntosLinea,
           borderColor: `hsl(${index * 60}, 70%, 50%)`,
           borderWidth: 1,
           fill: false,
@@ -155,7 +184,26 @@ y >= 0</textarea>
         };
       });
 
-      const datasets = [
+      const centro = puntos.reduce((acc, p) => [acc[0] + p.punto[0], acc[1] + p.punto[1]], [0, 0]).map(v => v / puntos.length);
+      puntos.sort((a, b) => {
+        const angA = Math.atan2(a.punto[1] - centro[1], a.punto[0] - centro[0]);
+        const angB = Math.atan2(b.punto[1] - centro[1], b.punto[0] - centro[0]);
+        return angA - angB;
+      });
+
+      const region = {
+        label: "Región Factible",
+        data: puntos.map(p => ({ x: p.punto[0], y: p.punto[1] })),
+        backgroundColor: "rgba(0, 255, 0, 0.2)",
+        borderColor: "green",
+        fill: true,
+        type: 'line',
+        tension: 0.1,
+        showLine: true,
+        pointRadius: 0
+      };
+
+      const datasets = [region,
         {
           label: "Región Factible",
           data: puntos.map(p => ({ x: p.punto[0], y: p.punto[1] })),
@@ -172,10 +220,8 @@ y >= 0</textarea>
         }
       ];
 
-      const allX = puntos.map(p => p.punto[0]);
-      const allY = puntos.map(p => p.punto[1]);
-
       chart = new Chart(ctx, {
+        plugins: [ChartDataLabels],
         type: "scatter",
         data: { datasets: [...lineas, ...datasets] },
         options: {
@@ -193,7 +239,26 @@ y >= 0</textarea>
             }
           },
           plugins: {
-            legend: { display: true }
+            datalabels: {
+              display: function(context) {
+                return context.dataset.label && context.dataIndex === 0;
+              },
+              align: 'top',
+              anchor: 'end',
+              font: {
+                weight: 'bold',
+                size: 10
+              },
+              formatter: function(value, context) {
+                const dataset = context.dataset;
+                const label = dataset.label;
+                if (label === 'Región Factible' || label === 'Óptimo') {
+                  const point = dataset.data[context.dataIndex];
+                  return `(${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
+                }
+                return label;
+              }
+            }
           }
         }
       });
