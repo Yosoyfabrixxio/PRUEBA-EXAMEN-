@@ -111,64 +111,45 @@ y >= 0</textarea>
         restricciones.push({ coefs, tipo, rhs });
       }
 
-      const puntos = [];
+      const puntosFactibles = [];
       for (let i = 0; i < restricciones.length; i++) {
         for (let j = i + 1; j < restricciones.length; j++) {
           const p = interseccion(restricciones[i], restricciones[j]);
           if (p && esFactible(p, restricciones)) {
-            const z = objCoefs[0]*p[0] + objCoefs[1]*p[1];
-            puntos.push({ punto: p, z });
-          }
-        }
-      }
-
-      if (puntos.length === 0) {
-        document.getElementById("resultado").innerHTML = "<b>⚠️ No hay región factible. Verifica si las restricciones se cruzan en una zona común.</b>";
-        return;
-      }
-
-      const allX = puntos.map(p => p.punto[0]);
-      const allY = puntos.map(p => p.punto[1]);
-
-      puntos.sort((a, b) => tipoOpt === 'max' ? b.z - a.z : a.z - b.z);
-      const optimo = puntos[0];
-
-      const lineas = restricciones.map((r, index) => {
-        const puntosLinea = [];
-        let etiqueta = `${r.coefs[0]}x + ${r.coefs[1]}y ${r.tipo} ${r.rhs}`;
-        for (let x = 0; x <= Math.max(...allX) + 5; x += 0.5) {
-          const a = r.coefs[0];
-          const b = r.coefs[1];
-          const c = r.rhs;
-          if (b !== 0) {
-            const y = (c - a * x) / b;
-            if (y >= 0 && y <= Math.max(...allY) + 5) {
-              puntosLinea.push({ x, y });
+            const rounded = p.map(n => Math.round(n * 1000) / 1000);
+            if (!puntosFactibles.some(q => q[0] === rounded[0] && q[1] === rounded[1])) {
+              puntosFactibles.push(rounded);
             }
           }
         }
-        return {
-          label: etiqueta,
-          data: puntosLinea,
-          borderColor: `hsl(${index * 60}, 70%, 50%)`,
-          borderWidth: 1,
-          fill: false,
-          showLine: true,
-          pointRadius: 0,
-          type: 'line'
-        };
-      });
+      }
 
-      const centro = puntos.reduce((acc, p) => [acc[0] + p.punto[0], acc[1] + p.punto[1]], [0,0]).map(v => v / puntos.length);
-      puntos.sort((a, b) => {
-        const angA = Math.atan2(a.punto[1] - centro[1], a.punto[0] - centro[0]);
-        const angB = Math.atan2(b.punto[1] - centro[1], b.punto[0] - centro[0]);
+      if (puntosFactibles.length < 3) {
+        document.getElementById("resultado").innerHTML = "<b>⚠️ No hay suficientes puntos para formar una región factible.</b>";
+        return;
+      }
+
+      const allX = puntosFactibles.map(p => p[0]);
+      const allY = puntosFactibles.map(p => p[1]);
+
+      const puntosZ = puntosFactibles.map(p => ({
+        punto: p,
+        z: objCoefs[0]*p[0] + objCoefs[1]*p[1]
+      }));
+
+      puntosZ.sort((a, b) => tipoOpt === 'max' ? b.z - a.z : a.z - b.z);
+      const optimo = puntosZ[0];
+
+      const centro = puntosFactibles.reduce((acc, p) => [acc[0]+p[0], acc[1]+p[1]], [0,0]).map(v => v / puntosFactibles.length);
+      puntosFactibles.sort((a, b) => {
+        const angA = Math.atan2(a[1] - centro[1], a[0] - centro[0]);
+        const angB = Math.atan2(b[1] - centro[1], b[0] - centro[0]);
         return angA - angB;
       });
 
       const region = {
         label: "Región Factible",
-        data: puntos.map(p => ({ x: p.punto[0], y: p.punto[1] })),
+        data: puntosFactibles.map(p => ({ x: p[0], y: p[1] })),
         backgroundColor: "rgba(0, 255, 0, 0.2)",
         borderColor: "green",
         fill: true,
@@ -178,12 +159,18 @@ y >= 0</textarea>
         pointRadius: 0
       };
 
+      const vertices = puntosFactibles.map((p, i) => ({
+        x: p[0],
+        y: p[1],
+        label: String.fromCharCode(65 + i)
+      }));
+
       const datasets = [region,
         {
-          label: "Región Factible",
-          data: puntos.map(p => ({ x: p.punto[0], y: p.punto[1] })),
-          backgroundColor: "rgba(0, 255, 0, 0.4)",
-          pointRadius: 5,
+          label: "Vértices",
+          data: vertices,
+          backgroundColor: "rgba(0, 255, 0, 0.5)",
+          pointRadius: 6,
           type: "scatter"
         },
         {
@@ -198,7 +185,7 @@ y >= 0</textarea>
       chart = new Chart(ctx, {
         plugins: [ChartDataLabels],
         type: "scatter",
-        data: { datasets: [...lineas, ...datasets] },
+        data: { datasets },
         options: {
           responsive: true,
           scales: {
@@ -215,23 +202,23 @@ y >= 0</textarea>
           },
           plugins: {
             datalabels: {
-              display: function(context) {
-                return context.dataset.label && context.dataIndex === 0;
-              },
+              display: true,
               align: 'top',
-              anchor: 'end',
+              anchor: 'center',
               font: {
                 weight: 'bold',
                 size: 10
               },
               formatter: function(value, context) {
                 const dataset = context.dataset;
-                const label = dataset.label;
-                if (label === 'Región Factible' || label === 'Óptimo') {
+                if (dataset.label === 'Vértices') {
+                  return dataset.data[context.dataIndex].label;
+                }
+                if (dataset.label === 'Óptimo') {
                   const point = dataset.data[context.dataIndex];
                   return `(${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
                 }
-                return label;
+                return null;
               }
             }
           }
