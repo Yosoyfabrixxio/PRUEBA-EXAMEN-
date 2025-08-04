@@ -2,238 +2,319 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Método Simplex Mejorado</title>
+  <title>Simplex Interpretador Mejorado</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
   <style>
-    body { font-family: Arial; padding: 20px; background: #f0f0f0; }
-    input, textarea, select, button { width: 100%; padding: 10px; margin: 10px 0; }
-    canvas { background: white; margin-top: 20px; }
-    #resultado { background: #fff; padding: 15px; border: 1px solid #ccc; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      padding: 20px;
+      background-color: #f0f2f5;
+      color: #333;
+      line-height: 1.6;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    h2 {
+      text-align: center;
+      color: #0056b3;
+      margin-bottom: 20px;
+    }
+    textarea, button {
+      width: 100%;
+      margin: 10px 0;
+      padding: 12px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      box-sizing: border-box; /* Asegura que padding no aumente el ancho */
+    }
+    button {
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #0056b3;
+    }
+    canvas {
+      background: #fff;
+      margin-top: 20px;
+      border: 1px solid #eee;
+      border-radius: 5px;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+      background: #fff;
+      font-size: 14px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f4;
+      font-weight: bold;
+    }
+    tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+    #resultado {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f9f9f9;
+      border: 1px solid #e0e0e0;
+      border-radius: 5px;
+    }
+    #resultado h3 {
+      color: #28a745;
+      margin-top: 0;
+    }
+    .error {
+      color: #dc3545;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
 
-  <h2>📈 Método Simplex (Con símbolos extendidos)</h2>
-
-  <label>Tipo de Optimización:</label>
-  <select id="tipoOptimizacion">
-    <option value="max">Maximizar</option>
-    <option value="min">Minimizar</option>
-  </select>
-
-  <label>Método de Solución:</label>
-  <select id="metodoSolucion">
-    <option value="grafico">Gráfico</option>
-    <option value="simplex">Simplex</option>
-  </select>
-
-  <label>Función Objetivo (Ej: Z = 40x + 70y):</label>
-  <input id="objetivo" placeholder="Z = 40x + 70y" value="Z = 40x + 70y">
-
-  <label>Restricciones (una por línea):</label>
-  <textarea id="restricciones" rows="6">x + 2y <= 50
-4x + 3y <= 120
-x >= 0
-y >= 0</textarea>
-
-  <button onclick="resolver()">Resolver y Graficar</button>
+<div class="container">
+  <h2>🔍 Resolver Problemas de Programación Lineal</h2>
+  <textarea id="textoProblema" rows="8" placeholder="Pega aquí el enunciado del problema (ej. Maximizar Z = 20X + 30Y sujeto a 3X + 4Y <= 100 y 5X + 2Y <= 80)"></textarea>
+  <button onclick="resolverProblema()">📌 Interpretar y Resolver</button>
 
   <div id="resultado"></div>
   <canvas id="grafica" width="900" height="600"></canvas>
+</div>
 
-  <script>
-    let chart;
+<script>
+// Usa una función de alto nivel para manejar toda la lógica y el manejo de errores
+function resolverProblema() {
+  const outputDiv = document.getElementById("resultado");
+  outputDiv.innerHTML = ""; // Limpia el resultado anterior
 
-    function parseExpresion(exp) {
-      exp = exp.replace(/\s/g, '').toLowerCase();
-      const coef = { x: 0, y: 0 };
-      const regex = /([+-]?\d*\.?\d*)\*?([xy])/g;
-      let match;
-      while ((match = regex.exec(exp)) !== null) {
-        let num = match[1];
-        if (num === "" || num === "+") num = 1;
-        else if (num === "-") num = -1;
-        coef[match[2]] += parseFloat(num);
-      }
-      return [coef.x, coef.y];
+  const textoOriginal = document.getElementById("textoProblema").value;
+  if (!textoOriginal) {
+    outputDiv.innerHTML = '<p class="error">Por favor, introduce un problema para resolver.</p>';
+    return;
+  }
+
+  try {
+    const texto = textoOriginal.toLowerCase().replace(/\n/g, " ");
+
+    const isMax = !texto.includes('minimizar');
+    
+    // Mejor detección de variables para manejar múltiples letras
+    const variables = [...new Set(texto.matchAll(/(\b[a-z]\b)/g))]
+                      .map(match => match[0].toUpperCase())
+                      .sort();
+
+    if (variables.length < 2) {
+      throw new Error("No se detectaron al menos dos variables (ej. 'x' y 'y').");
     }
 
-    function normalizarSimbolos(str) {
-      return str.replace(/≤/g, "<=")
-                .replace(/≥/g, ">=")
-                .replace(/</g, "<")
-                .replace(/>/g, ">")
-                .replace(/=/g, "=");
+    const [var1, var2] = variables;
+
+    // --- PARSEO DE LA FUNCIÓN OBJETIVO ---
+    let objStr = parseObjetivo(texto, var1, var2, isMax);
+
+    // --- PARSEO DE RESTRICCIONES ---
+    const restricciones = parseRestricciones(texto, var1, var2);
+    restricciones.push(`${var1} >= 0`, `${var2} >= 0`);
+
+    // --- RESOLUCIÓN Y VISUALIZACIÓN ---
+    resolver(objStr, restricciones, var1, var2, isMax);
+
+  } catch (error) {
+    outputDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+    console.error(error);
+  }
+}
+
+function parseObjetivo(texto, var1, var2, isMax) {
+  const matches = [...texto.matchAll(/(\d+(?:\.\d+)?)\s*([a-z])\b/g)];
+  if (matches.length === 0) {
+    throw new Error("No se pudo detectar la función objetivo. Asegúrate de que tenga la forma '20x + 30y'.");
+  }
+
+  let objExpr = matches.map(m => {
+    const value = parseFloat(m[1]);
+    const variable = m[2].toUpperCase();
+    return `${value}${variable}`;
+  }).join(' + ');
+
+  if (!isMax) {
+    // Si es minimización, invertimos los signos para maximizar el negativo
+    const terms = objExpr.split(' + ').map(term => {
+      const parts = term.match(/(\d+(?:\.\d+)?)([A-Z])/);
+      return `-${parts[1]}${parts[2]}`;
+    });
+    objExpr = terms.join(' + ');
+    return `Z = ${objExpr}`;
+  }
+  
+  return `Z = ${objExpr}`;
+}
+
+function parseRestricciones(texto, var1, var2) {
+  const restricciones = [];
+  const lines = texto.split(/sujeto a|restricciones|y\b|además/);
+
+  lines.forEach(line => {
+    const match = line.match(/(?:(\d+(?:\.\d+)?)\s*([a-z]))\s*(?:[+\-]\s*(?:\d+(?:\.\d+)?)\s*([a-z]))?\s*(<=|>=)\s*(\d+(?:\.\d+)?)/);
+    if (match) {
+      let expr = line.trim().replace(new RegExp(var1, 'g'), var1).replace(new RegExp(var2, 'g'), var2);
+      restricciones.push(expr);
     }
+  });
 
-    function interseccion(r1, r2) {
-      const [a1, b1] = r1.coefs;
-      const [a2, b2] = r2.coefs;
-      const c1 = r1.rhs;
-      const c2 = r2.rhs;
-      const det = a1 * b2 - a2 * b1;
-      if (det === 0) return null;
-      const x = (c1 * b2 - c2 * b1) / det;
-      const y = (a1 * c2 - a2 * c1) / det;
-      return [x, y];
+  if (restricciones.length === 0) {
+    throw new Error("No se detectaron restricciones válidas. Asegúrate de que tengan la forma '3x + 4y <= 100'.");
+  }
+  return restricciones;
+}
+
+
+// --- LÓGICA DE RESOLUCIÓN (Optimizada) ---
+function resolver(objStr, restricciones, var1, var2, isMax) {
+  const Z = (a, b) => {
+    const expr = objStr.replace("Z =", "")
+                        .replaceAll(var1, a)
+                        .replaceAll(var2, b);
+    try {
+      return eval(expr);
+    } catch {
+      return isMax ? -Infinity : Infinity;
     }
+  };
 
-    function esFactible([x, y], restricciones) {
-      for (const r of restricciones) {
-        const val = r.coefs[0] * x + r.coefs[1] * y;
-        if (r.tipo === "<=" && val > r.rhs + 0.001) return false;
-        if (r.tipo === ">=" && val < r.rhs - 0.001) return false;
-        if (r.tipo === "=" && Math.abs(val - r.rhs) > 0.001) return false;
-      }
-      return x >= 0 && y >= 0;
+  // Estimar límites de manera más inteligente
+  const limites = restricciones.map(r => {
+    const match = r.match(/(\d+(?:\.\d+)?)$/);
+    return match ? parseFloat(match[1]) : 0;
+  });
+  const maxValor = Math.max(...limites, 100) * 1.2; // Un 20% más para una mejor visualización
+  const paso = Math.ceil(maxValor / 50); // Aumenta la granularidad para más precisión
+
+  const puntos = [];
+  for (let i = 0; i <= maxValor; i += paso) {
+    for (let j = 0; j <= maxValor; j += paso) {
+      puntos.push({ [var1]: i, [var2]: j });
     }
+  }
 
-    function resolver() {
-      const tipoOpt = document.getElementById('tipoOptimizacion').value;
-      const ctx = document.getElementById('grafica').getContext('2d');
-      if (chart) chart.destroy();
-
-      const objStr = document.getElementById("objetivo").value.trim();
-      const restStr = document.getElementById("restricciones").value.trim().split("\n");
-
-      const objCoefs = parseExpresion(objStr);
-
-      const restricciones = [];
-      for (let r of restStr) {
-        r = normalizarSimbolos(r);
-        const match = r.match(/(.+?)(<=|>=|=)(.+)/);
-        if (!match) continue;
-        const lhs = match[1].trim();
-        const tipo = match[2];
-        const rhs = parseFloat(match[3]);
-        const coefs = parseExpresion(lhs);
-        restricciones.push({ coefs, tipo, rhs });
+  const puntosValidos = puntos.filter(p => {
+    return restricciones.every(r => {
+      const expr = r.replaceAll(var1, p[var1]).replaceAll(var2, p[var2]);
+      try {
+        return eval(expr);
+      } catch {
+        return false;
       }
+    });
+  });
 
-      const puntosFactibles = [];
-      for (let i = 0; i < restricciones.length; i++) {
-        for (let j = i + 1; j < restricciones.length; j++) {
-          const p = interseccion(restricciones[i], restricciones[j]);
-          if (p && esFactible(p, restricciones)) {
-            const rounded = p.map(n => Math.round(n * 1000) / 1000);
-            if (!puntosFactibles.some(q => q[0] === rounded[0] && q[1] === rounded[1])) {
-              puntosFactibles.push(rounded);
-            }
-          }
-        }
-      }
+  if (puntosValidos.length === 0) {
+      throw new Error("No se encontró una región factible. Revisa las restricciones.");
+  }
 
-      if (puntosFactibles.length < 3) {
-        document.getElementById("resultado").innerHTML = "<b>⚠️ No hay suficientes puntos para formar una región factible.</b>";
-        return;
-      }
+  const resultados = puntosValidos.map(p => {
+    return { x: p[var1], y: p[var2], z: Z(p[var1], p[var2]) };
+  });
 
-      const allX = puntosFactibles.map(p => p[0]);
-      const allY = puntosFactibles.map(p => p[1]);
+  // Encuentra el óptimo de forma dinámica (max o min)
+  const optimo = resultados.reduce((acc, val) => {
+    if (acc === null) return val;
+    return isMax ? (val.z > acc.z ? val : acc) : (val.z < acc.z ? val : acc);
+  }, null);
 
-      const puntosZ = puntosFactibles.map(p => ({
-        punto: p,
-        z: objCoefs[0]*p[0] + objCoefs[1]*p[1]
-      }));
+  // Mostrar tabla y resultado final
+  const outputDiv = document.getElementById("resultado");
+  let tabla = `<h3>📊 Tabla de Evaluación de Puntos</h3><table><tr><th>${var1}</th><th>${var2}</th><th>Z</th></tr>`;
+  resultados.forEach(r => {
+    tabla += `<tr><td>${r.x.toFixed(2)}</td><td>${r.y.toFixed(2)}</td><td>${r.z.toFixed(2)}</td></tr>`;
+  });
+  tabla += "</table>";
 
-      puntosZ.sort((a, b) => tipoOpt === 'max' ? b.z - a.z : a.z - b.z);
-      const optimo = puntosZ[0];
+  outputDiv.innerHTML = `
+    <h3>✅ Resultado Óptimo</h3>
+    <p>🔍 Función objetivo: <strong>${objStr}</strong></p>
+    <p>➡️ Se interpretó como un problema de <strong>${isMax ? 'Maximización' : 'Minimización'}</strong>.</p>
+    <p>🔝 <strong>Mejor combinación:</strong> ${var1} = ${optimo.x.toFixed(2)}, ${var2} = ${optimo.y.toFixed(2)}</p>
+    <p>💡 <strong>Valor óptimo de Z:</strong> ${optimo.z.toFixed(2)}</p>
+    ${tabla}
+  `;
 
-      const centro = puntosFactibles.reduce((acc, p) => [acc[0]+p[0], acc[1]+p[1]], [0,0]).map(v => v / puntosFactibles.length);
-      puntosFactibles.sort((a, b) => {
-        const angA = Math.atan2(a[1] - centro[1], a[0] - centro[0]);
-        const angB = Math.atan2(b[1] - centro[1], b[0] - centro[0]);
-        return angA - angB;
-      });
+  // Dibuja la gráfica
+  const ctx = document.getElementById("grafica").getContext("2d");
+  const existingChart = Chart.getChart(ctx);
+  if (existingChart) {
+    existingChart.destroy();
+  }
 
-      const region = {
-        label: "Región Factible",
-        data: puntosFactibles.map(p => ({ x: p[0], y: p[1] })),
-        backgroundColor: "rgba(0, 255, 0, 0.2)",
-        borderColor: "green",
-        fill: true,
-        type: 'line',
-        tension: 0.1,
-        showLine: true,
-        pointRadius: 0
-      };
-
-      const vertices = puntosFactibles.map((p, i) => ({
-        x: p[0],
-        y: p[1],
-        label: String.fromCharCode(65 + i)
-      }));
-
-      const datasets = [region,
+  new Chart(ctx, {
+    type: 'scatter',
+    data: {
+      datasets: [
         {
-          label: "Vértices",
-          data: vertices,
-          backgroundColor: "rgba(0, 255, 0, 0.5)",
-          pointRadius: 6,
-          type: "scatter"
+          label: 'Región factible',
+          data: resultados.map(r => ({ x: r.x, y: r.y })),
+          backgroundColor: 'rgba(0, 123, 255, 0.5)'
         },
         {
-          label: "Óptimo",
-          data: [{ x: optimo.punto[0], y: optimo.punto[1] }],
-          backgroundColor: "red",
-          pointRadius: 7,
-          type: "scatter"
+          label: `Punto óptimo (${isMax ? 'Max' : 'Min'})`,
+          data: [{ x: optimo.x, y: optimo.y }],
+          backgroundColor: '#dc3545',
+          pointRadius: 10,
+          pointHoverRadius: 12,
         }
-      ];
-
-      chart = new Chart(ctx, {
-        plugins: [ChartDataLabels],
-        type: "scatter",
-        data: { datasets },
-        options: {
-          responsive: true,
-          scales: {
-            x: {
-              min: 0,
-              max: Math.max(...allX) + 5,
-              title: { display: true, text: 'x' }
-            },
-            y: {
-              min: 0,
-              max: Math.max(...allY) + 5,
-              title: { display: true, text: 'y' }
-            }
-          },
-          plugins: {
-            datalabels: {
-              display: true,
-              align: 'top',
-              anchor: 'center',
-              font: {
-                weight: 'bold',
-                size: 10
-              },
-              formatter: function(value, context) {
-                const dataset = context.dataset;
-                if (dataset.label === 'Vértices') {
-                  return dataset.data[context.dataIndex].label;
-                }
-                if (dataset.label === 'Óptimo') {
-                  const point = dataset.data[context.dataIndex];
-                  return `(${point.x.toFixed(1)}, ${point.y.toFixed(1)})`;
-                }
-                return null;
-              }
+      ]
+    },
+    options: {
+      scales: {
+        x: {
+          title: { display: true, text: var1 },
+          beginAtZero: true,
+          grid: { color: '#e9ecef' }
+        },
+        y: {
+          title: { display: true, text: var2 },
+          beginAtZero: true,
+          grid: { color: '#e9ecef' }
+        }
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              const point = context.raw;
+              return `${context.dataset.label}: (${var1}=${point.x.toFixed(2)}, ${var2}=${point.y.toFixed(2)})`;
             }
           }
+        },
+        legend: {
+          position: 'top',
+        },
+        title: {
+          display: true,
+          text: `Solución Gráfica del Problema`,
+          font: { size: 18 }
         }
-      });
-
-      document.getElementById("resultado").innerHTML = `
-        <h3>🔍 Resultado:</h3>
-        <b>Tipo de optimización:</b> ${tipoOpt === 'max' ? 'Maximización' : 'Minimización'}<br>
-        <b>Z ${tipoOpt === 'max' ? 'Máxima' : 'Mínima'}:</b> ${optimo.z.toFixed(2)}<br>
-        <b>x:</b> ${optimo.punto[0].toFixed(2)}<br>
-        <b>y:</b> ${optimo.punto[1].toFixed(2)}
-      `;
+      }
     }
-  </script>
+  });
+}
+</script>
 
 </body>
 </html>
